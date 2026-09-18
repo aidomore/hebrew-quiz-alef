@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Учим Иврит с Салютом! 🇮🇱✨</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;800&display=swap');
+        body {
+            font-family: 'Montserrat', sans-serif;
+            background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 50%, #1e1b4b 100%);
+            overflow-x: hidden;
+        }
+        @keyframes burst {
+            0% { transform: translate(0, 0) scale(1); opacity: 1; }
+            100% { transform: translate(var(--tx), var(--ty)) scale(0.3); opacity: 0; }
+        }
+        .particle {
+            position: absolute;
+            pointer-events: none;
+            animation: burst 0.8s ease-out forwards;
+            font-size: 20px;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4 relative">
+
+    <div class="bg-white/95 backdrop-blur-md rounded-3xl shadow-2xl w-full max-w-lg p-6 md:p-8 text-gray-800 relative overflow-hidden">
+        
+        <!-- Главное меню -->
+        <div id="start-screen" class="text-center py-4">
+            <div class="text-6xl mb-2">🇮🇱✨</div>
+            <h1 class="text-3xl font-extrabold text-blue-600 mb-2">Иврит Тренажер</h1>
+            <p class="text-gray-600 mb-6">В базе <span id="total-words">0</span> слов с некудот! Выбери режим обучения:</p>
+            
+            <div class="space-y-3">
+                <button onclick="startQuiz('he-ru')" class="w-full bg-gradient-to-r from-blue-500 to-indigo-600 text-white font-bold text-lg py-3.5 rounded-2xl shadow-lg hover:opacity-90 transition transform active:scale-95 cursor-pointer">
+                    🇮🇱 Иврит ➡️ Русский 🇷🇺
+                </button>
+                <button onclick="startQuiz('ru-he')" class="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold text-lg py-3.5 rounded-2xl shadow-lg hover:opacity-90 transition transform active:scale-95 cursor-pointer">
+                    🇷🇺 Русский ➡️ Иврит 🇮🇱
+                </button>
+            </div>
+        </div>
+
+        <!-- Игровой экран -->
+        <div id="game-screen" class="hidden relative">
+            <div class="flex justify-between items-center mb-6">
+                <span id="score" class="font-bold text-blue-600 text-lg">Счет: 0</span>
+                <span id="question-progress" class="text-sm font-semibold text-gray-500">Вопрос 1 из 10</span>
+                <button onclick="backToMenu()" class="text-xs bg-gray-100 hover:bg-gray-200 text-gray-600 font-semibold px-3 py-1.5 rounded-xl transition cursor-pointer">
+                    🏠 Меню
+                </button>
+            </div>
+
+            <!-- Таймер 15 секунд -->
+            <div class="w-full bg-gray-200 h-2.5 rounded-full mb-8 overflow-hidden">
+                <div id="timer-bar" class="bg-blue-500 h-full transition-all duration-1000 linear w-full"></div>
+            </div>
+
+            <!-- Слово для перевода -->
+            <div class="text-center mb-8 relative">
+                <p id="prompt-label" class="text-xs uppercase tracking-widest text-blue-500 font-bold mb-2">Переведи слово:</p>
+                <div id="target-word" class="text-3xl md:text-4xl font-extrabold text-gray-800 tracking-wide drop-shadow-sm" dir="rtl">
+                    שָׁלוֹם
+                </div>
+            </div>
+
+            <!-- Варианты ответов -->
+            <div id="options-container" class="grid grid-cols-2 gap-3 relative">
+                <!-- Кнопки ответов -->
+            </div>
+        </div>
+
+        <!-- Экран результатов раунда -->
+        <div id="result-screen" class="hidden text-center py-6">
+            <div class="text-6xl mb-4" id="result-emoji">🏆</div>
+            <h2 class="text-3xl font-extrabold text-blue-600 mb-2">Раунд завершен!</h2>
+            <p id="final-score-text" class="text-xl text-gray-700 mb-6">Твой результат: 10 из 10</p>
+            <button onclick="backToMenu()" class="w-full bg-gradient-to-r from-blue-500 to-indigo-600 text-white font-bold text-xl py-4 rounded-2xl shadow-lg hover:opacity-90 transition transform active:scale-95 cursor-pointer">
+                В главное меню 🏠
+            </button>
+        </div>
+
+    </div>
+
+    <script>
+        const wordsDatabase = [
+            { he: "שָׁלוֹם", ru: "здравствуйте" },
+            { he: "תּוֹדָה", ru: "спасибо" },
+            { he: "בְּבָקָשָׁה", ru: "пожалуйста" },
+            { he: "סְלִיחָה", ru: "извините / простите" },
+            { he: "כֵּן", ru: "да" },
+            { he: "לֹא", ru: "нет" },
+            { he: "בְּסֵדֶר", ru: "в порядке / хорошо" },
+            { he: "מְעוּלֶה", ru: "отлично / великолепно" },
+            { he: "נָעִים מְאֹד", ru: "очень приятно" },
+            { he: "מָה נִשְׁמָע", ru: "как дела?" },
+            { he: "מָה שְׁלוֹמְךָ", ru: "как твои дела? (м)" },
+            { he: "מָה שְׁלוֹמֵךְ", ru: "как твои дела? (ж)" },
+            { he: "בֹּקֶר טוֹב", ru: "доброе утро" },
+            { he: "עֶרֶב טוֹב", ru: "добрый вечер" },
+            { he: "לַיְלָה טוֹב", ru: "спокойной ночи" },
+            { he: "לְהִתְרָאוֹת", ru: "до свидания" },
+            { he: "בַּאי", ru: "пока" },
+            { he: "אוּלַי", ru: "может быть" },
+            { he: "בֶּאֱמֶת", ru: "правда / действительно" },
+            { he: "בֶּטַח", ru: "конечно / точно" },
+            { he: "אֵין בַּעֲיָה", ru: "нет проблем" },
+            { he: "הַכֹּל טוֹב", ru: "всё хорошо" },
+            { he: "חֲבָל", ru: "жаль" },
+            { he: "בְּתֵאָבוֹן", ru: "приятного аппетита" },
+            { he: "לַבְרִיאוּת", ru: "будьте здоровы" },
+            { he: "אֲנִי", ru: "я" },
+            { he: "אַתָּה", ru: "ты (м.р.)" },
+            { he: "אַתְּ", ru: "ты (ж.р.)" },
+            { he: "הוּא", ru: "он" },
+            { he: "הִיא", ru: "она" },
+            { he: "אֲנַחְנוּ", ru: "мы" },
+            { he: "אַתֶּם", ru: "вы (м.р.)" },
+            { he: "אַתֵּן", ru: "вы (ж.р.)" },
+            { he: "הֵם", ru: "они (м.р.)" },
+            { he: "הֵן", ru: "они (ж.р.)" },
+            { he: "זֶה", ru: "это (м.р.)" },
+            { he: "זֹאת", ru: "это (ж.р.)" },
+            { he: "אֵלֶּה", ru: "эти" },
+            { he: "מִי", ru: "кто" },
+            { he: "מָה", ru: "что" },
+            { he: "אֵיפֹה", ru: "где" },
+            { he: "לְאָן", ru: "куда" },
+            { he: "מֵאַיִן", ru: "откуда" },
+            { he: "מָתַי", ru: "когда" },
+            { he: "לָמָּה", ru: "почему" },
+            { he: "אֵיךְ", ru: "как" },
+            { he: "כַּמָּה", ru: "сколько" },
+            { he: "אֵיזֶה", ru: "какой (м.р.)" },
+            { he: "אֵיזוֹ", ru: "какая (ж.р.)" },
+            { he: "אֵילוּ", ru: "какие" },
+            { he: "וְ...", ru: "и" },
+            { he: "אוֹ", ru: "или" },
+            { he: "אֲבָל", ru: "но" },
+            { he: "כִּי", ru: "потому что / так как" },
+            { he: "עַל", ru: "на / о" },
+            { he: "בְּ...", ru: "в" },
+            { he: "לְ...", ru: "к / для" },
+            { he: "מִ...", ru: "из / от" },
+            { he: "עִם", ru: "с (кем-то)" },
+            { he: "בְּלִי", ru: "без" },
+            { he: "עַד", ru: "до" },
+            { he: "שֶׁ...", ru: "что (союз)" },
+            { he: "אִם", ru: "если" },
+            { he: "גַּם", ru: "тоже / также" },
+            { he: "רַק", ru: "только" },
+            { he: "יוֹתֵר", ru: "больше" },
+            { he: "פָּחוֹת", ru: "меньше" },
+            { he: "הַרְבֵּה", ru: "много" },
+            { he: "קְצָת", ru: "немного" },
+            { he: "מַמָּשׁ", ru: "действительно / очень" },
+            { he: "מְאֹד", ru: " очень" },
+            { he: "כְּבָר", ru: "уже" },
+            { he: "עוֹד", ru: "ещё" },
+            { he: "שׁוּב", ru: "снова / опять" },
+            { he: "לִפְנֵי", ru: "перед / до" },
+            { he: "אַחֲרֵי", ru: "после" },
+            { he: "לְפִי", ru: "по / согласно" },
+            { he: "בִּגְלַל", ru: "из-за" },
+            { he: "בִּשְׁבִיל", ru: "ради / для" },
+            { he: "אֵיךְ קוֹרְאִים לְךָ", ru: "как тебя зовут? (м)" },
+            { he: "אֵיךְ קוֹרְאִים לָךְ", ru: "как тебя зовут? (ж)" },
+            { he: "שְׁמִי", ru: "меня зовут..." },
+            { he: "מֵאַיִן אַתָּה", ru: "откуда ты?" },
+            { he: "אֲנִי מִ...", ru: "я из..." },
+            { he: "מָה זֶה", ru: "что это?" },
+            { he: "כַּמָּה זֶה עוֹלֶה", ru: "сколько это стоит?" },
+            { he: "אֵיפֹה הַשּׁוּתָף/הַשֵּׁרוּתִים", ru: "где туалет?" },
+            { he: "אֲנִי לֹא מֵבִין", ru: "я не понимаю (м)" },
+            { he: "אֲנִי לֹא מְבִינָה", ru: "я не понимаю (ж)" },
+            { he: "אַתָּה מְדַבֵּר אַנְגְלִית", ru: "говоришь по-английски?" },
+            { he: "אֲנִי מְדַבֵּר קְצָת עִבְרִית", ru: "говорю немного на иврите" },
+            { he: "אֶפְשָׁר", ru: "можно" },
+            { he: "אִי אֶפְשָׁר", ru: "нельзя / невозможно" },
+            { he: "צָרִיךְ", ru: "нужно (м)" },
+            { he: "צְרִיכָה", ru: "нужно (ж)" },
+            { he: "רוֹצֶה", ru: "хочу (м)" },
+            { he: "רוֹצָה", ru: "хочу (ж)" },
+            { he: "יֵשׁ", ru: "есть / имеется" },
+            { he: "אֵין", ru: "нет в наличии" },
+            { he: "הַיּוֹם", ru: "сегодня" },
+            { he: "מָחָר", ru: "завтра" },
+            { he: "אֶתְמוֹל", ru: "вчера" },
+            { he: "עַכְשָׁיו", ru: "сейчас" },
+            { he: "אַחַר כָּךְ", ru: "потом / позже" },
+            { he: "מוּקְדָם", ru: "рано" },
+            { he: "מְאוּחָר", ru: "поздно" },
+            { he: "תָּמִיד", ru: "всегда" },
+            { he: "אַף פַּעַם", ru: "никогда" },
+            { he: "לִפְעָמִים", ru: "иногда" },
+            { he: "יוֹם", ru: "день" },
+            { he: "שָׁבוּעַ", ru: "неделя" },
+            { he: "חֹדֶשׁ", ru: "месяц" },
+            { he: "שָׁנָה", ru: "год" },
+            { he: "זְמַן", ru: "время" },
+            { he: "שָׁעָה", ru: "час" },
+            { he: "דַּקָּה", ru: "минута" },
+            { he: "רֶגַע", ru: "секунда / момент" },
+            { he: "בֹּקֶר", ru: "утро" },
+            { he: "צָהֳרַיִם", ru: "полдень" },
+            { he: "עֶרֶב", ru: "вечер" },
+            { he: "לַיְלָה", ru: "ночь" },
+            { he: "סוֹף שָׁבוּעַ", ru: "выходные" },
+            { he: "שַׁבָּת", ru: "суббота" },
+            { he: "אִישׁ", ru: "мужчина / человек" },
+            { he: "אִשָּׁה", ru: "женщина / жена" },
+            { he: "אַבָּא", ru: "папа" },
+            { he: "אִמָּא", ru: "мама" },
+            { he: "בֵּן", ru: "сын" },
+            { he: "בַּת", ru: "дочь" },
+            { he: "יֶלֶד", ru: "мальчик / ребёнок" },
+            { he: "יַלְדָּה", ru: "девочка" },
+            { he: "יְלָדִים", ru: "дети" },
+            { he: "אָח", ru: "брат" },
+            { he: "אָחוֹת", ru: "сестра" },
+            { he: "חָבֵר", ru: "друг" },
+            { he: "חֲבֵרָה", ru: "подруга" },
+            { he: "מִשְׁפָּחָה", ru: "семья" },
+            { he: "בַּעַל", ru: "муж" },
+            { he: "אֲנָשִׁים", ru: "люди" },
+            { he: "בַּיִת", ru: "дом" },
+            { he: "עִיר", ru: "город" },
+            { he: "רְחוֹב", ru: "улица" },
+            { he: "מָקוֹם", ru: "место" },
+            { he: "חַנּוּת", ru: "магазин" },
+            { he: "סוּפֶר", ru: "супермаркет" },
+            { he: "שׁוּק", ru: "рынок" },
+            { he: "מִסְעָדָה", ru: "ресторан" },
+            { he: "קָפֶה", ru: "кафе" },
+            { he: "מָלוֹן", ru: "отель" },
+            { he: "בַּנְק", ru: "банк" },
+            { he: "דּוֹאַר", ru: "почта" },
+            { he: "בֵּית חוֹלִים", ru: "больница" },
+            { he: "בֵּית מִרְקַחַת", ru: "аптека" },
+            { he: "תַּחֲנָה", ru: "остановка / станция" },
+            { he: "אוֹטוֹבּוּס", ru: "автобус" },
+            { he: "רַכֶּבֶת", ru: "поезд" },
+            { he: "מוֹנִית", ru: "такси" },
+            { he: "שְׂדֵה תְּעוּפָה", ru: "аэропорт" },
+            { he: "דֶּרֶךְ", ru: "дорога / путь" },
+            { he: "יָמִינָה", ru: "направо" },
+            { he: "שְׂמֹאלָה", ru: "налево" },
+            { he: "יָשָׁר", ru: "прямо" },
+            { he: "קָרוֹב", ru: "близко" },
+            { he: "רָחוֹק", ru: "далеко" },
+            { he: "מַפְתֵּחַ", ru: "ключ" },
+            { he: "חֶדֶר", ru: "комната" },
+            { he: "אֹכֶל", ru: "еда" },
+            { he: "מַיִם", ru: "вода" },
+            { he: "לֶחֶם", ru: "хлеб" },
+            { he: "תֵּה", ru: "чай" },
+            { he: "חָלָב", ru: "молоко" },
+            { he: "בָּשָׂר", ru: "мясо" },
+            { he: "עוֹף", ru: "курица" },
+            { he: "דָּג", ru: "рыба" },
+            { he: "יְרָקוֹת", ru: "овощи" },
+            { he: "פֵּרוֹת", ru: "фрукты" },
+            { he: "גְּבִינָה", ru: "сыр" },
+            { he: "סָלָט", ru: "салат" },
+            { he: "חֶשְׁבּוֹן", ru: "счёт" },
+            { he: "כֶּסֶף", ru: "деньги" },
+            { he: "כַּרְטִיס אַשְׁרַאי", ru: "кредитная карта" },
+            { he: "מְזוּמָן", ru: "наличные" },
+            { he: "מְחִיר", ru: "цена" },
+            { he: "קַבָּלָה", ru: "чек / квитанция" },
+            { he: "שֶׁקֶל", ru: "шекель" },
+            { he: "טוֹב", ru: "хороший" },
+            { he: "רַע", ru: "плохой" },
+            { he: "גָּדוֹל", ru: "большой" },
+            { he: "קָטָן", ru: "маленький" },
+            { he: "יָפֶה", ru: "красивый" },
+            { he: "חָדָשׁ", ru: "новый" },
+            { he: "יָשָׁן", ru: "старый (о вещах)" },
+            { he: "זָקֵן", ru: "старый (о людях)" },
+            { he: "צָעִיר", ru: "молодой" },
+            { he: "חַם", ru: "горячий / жаркий" },
+            { he: "קַר", ru: "холодный" },
+            { he: "טָעִים", ru: "вкусный" },
+            { he: "יָקָר", ru: "дорогой" },
+            { he: "זוֹל", ru: "дешёвый" },
+            { he: "קַל", ru: "лёгкий" },
+            { he: "קָשֶׁה", ru: "трудный / тяжёлый" },
+            { he: "מָהִיר", ru: "быстрый" },
+            { he: "אִטִּי", ru: "медленный" },
+            { he: "חָשׁוּב", ru: "важный" },
+            { he: "מוּכָן", ru: "готовый" },
+            { he: "עָיֵף", ru: "уставший" },
+            { he: "חוֹלֶה", ru: "больной" },
+            { he: "שָׂמֵחַ", ru: "счастливый" },
+            { he: "מְעַנְיֵן", ru: "интересный" },
+            { he: "נָכוֹן", ru: "правильный" },
+            { he: "אֶחָד", ru: "один (1)" },
+            { he: "שְׁתַּיִם", ru: "два (2)" },
+            { he: "שָׁלֹשׁ", ru: "три (3)" },
+            { he: "אַרְבַּע", ru: "четыре (4)" },
+            { he: "חָמֵשׁ", ru: "пять (5)" },
+            { he: "שֵׁשׁ", ru: "шесть (6)" },
+            { he: "שֶׁבַע", ru: "семь (7)" },
+            { he: "שְׁמֹנֶה", ru: "восемь (8)" },
+            { he: "תֵּשַׁע", ru: "девять (9)" },
+            { he: "עֶשֶׂר", ru: "десять (10)" },
+            { he: "מֵאָה", ru: "сто (100)" },
+            { he: "אֶלֶף", ru: "тысяча (1000)" },
+            { he: "טֶלֶפוֹן", ru: "телефон" },
+            { he: "מַחְשֵׁב", ru: "компьютер" },
+            { he: "עֲבוֹדָה", ru: "работа" },
+            { he: "שְׁאֵלָה", ru: "вопрос" },
+            { he: "תְּשׁוּבָה", ru: "ответ" },
+            { he: "בְּעָיָה", ru: "проблема" },
+            { he: "פִּתְרוֹן", ru: "решение" },
+            { he: "מִלָּה", ru: "слово" },
+            { he: "שָׂפָה", ru: "язык (речь)" },
+            { he: "עִבְרִית", ru: "иврит" },
+            { he: "אַנְגְלִית", ru: "английский" },
+            { he: "רוּסִית", ru: "русский" },
+            { he: "שֵׁם", ru: "имя" },
+            { he: "מִסְפָּר", ru: "номер / число" },
+            { he: "חֹם", ru: "жара / температура" },
+            { he: "מֶזֶג אֲוִיר", ru: "погода" },
+            { he: "שֶׁמֶשׁ", ru: "солнце" },
+            { he: "גֶּשֶׁם", ru: "дождь" },
+            { he: "יָם", ru: "море" },
+            { he: "חוֹפֶשׁ", ru: "отпуск / свобода" },
+            { he: "בְּרִיאוּת", ru: "здоровье" },
+            { he: "מַזָּל", ru: "удача" },
+            { he: "יְצִיאָה", ru: "выход" },
+            { he: "כְּנִיסָה", ru: "вход" },
+            { he: "פָּתוּחַ", ru: "открыто" },
+            { he: "סָגוּר", ru: "закрыто" }
+        ];
+
+        document.getElementById('total-words').textContent = wordsDatabase.length;
+
+        const startScreen = document.getElementById('start-screen');
+        const gameScreen = document.getElementById('game-screen');
+        const resultScreen = document.getElementById('result-screen');
+        const targetWordEl = document.getElementById('target-word');
+        const promptLabelEl = document.getElementById('prompt-label');
+        const optionsContainer = document.getElementById('options-container');
+        const scoreEl = document.getElementById('score');
+        const progressEl = document.getElementById('question-progress');
+        const timerBar = document.getElementById('timer-bar');
+        const finalScoreText = document.getElementById('final-score-text');
+        const resultEmoji = document.getElementById('result-emoji');
+
+        let currentMode = 'he-ru'; // 'he-ru' или 'ru-he'
+        let sessionQueue = [];     // Очередь вопросов на текущую сессию
+        let mistakeQueue = [];     // Ошибочные слова для повторения в конце
+        let currentIndex = 0;
+        let score = 0;
+        let isAnswered = false;
+        let timerInterval = null;
+        let timeLeft = 15;
+
+        function startQuiz(mode) {
+            currentMode = mode;
+            startScreen.classList.add('hidden');
+            resultScreen.classList.add('hidden');
+            gameScreen.classList.remove('hidden');
+
+            score = 0;
+            currentIndex = 0;
+            mistakeQueue = [];
+            
+            // Берем 10 случайных слов для раунда
+            sessionQueue = [...wordsDatabase].sort(() => 0.5 - Math.random()).slice(0, 10);
+            loadQuestion();
+        }
+
+        function loadQuestion() {
+            if (currentIndex >= sessionQueue.length) {
+                // Если сессия закончилась, но есть ошибки — добавляем их в очередь на повтор
+                if (mistakeQueue.length > 0) {
+                    sessionQueue = [...mistakeQueue];
+                    mistakeQueue = [];
+                    currentIndex = 0;
+                } else {
+                    endGame();
+                    return;
+                }
+            }
+
+            isAnswered = false;
+            startTimer();
+
+            const currentPair = sessionQueue[currentIndex];
+            progressEl.textContent = `Вопрос ${currentIndex + 1} из ${sessionQueue.length}`;
+            scoreEl.textContent = `Счет: ${score}`;
+
+            let displayedText = "";
+            let correctAns = "";
+
+            if (currentMode === 'he-ru') {
+                promptLabelEl.textContent = "Переведи на русский:";
+                displayedText = currentPair.he;
+                targetWordEl.setAttribute('dir', 'rtl');
+                correctAns = currentPair.ru;
+            } else {
+                promptLabelEl.textContent = "Переведи на иврит:";
+                displayedText = currentPair.ru;
+                targetWordEl.setAttribute('dir', 'ltr');
+                correctAns = currentPair.he;
+            }
+            targetWordEl.textContent = displayedText;
+
+            // Генерируем варианты ответов (1 правильный + 3 случайных)
+            let options = [correctAns];
+            while (options.length < 4) {
+                let randomPair = wordsDatabase[Math.floor(Math.random() * wordsDatabase.length)];
+                let randomOpt = (currentMode === 'he-ru') ? randomPair.ru : randomPair.he;
+                if (!options.includes(randomOpt)) {
+                    options.push(randomOpt);
+                }
+            }
+            options.sort(() => 0.5 - Math.random());
+
+            optionsContainer.innerHTML = '';
+            options.forEach(opt => {
+                const btn = document.createElement('button');
+                btn.textContent = opt;
+                if (currentMode === 'ru-he') {
+                    btn.setAttribute('dir', 'rtl');
+                } else {
+                    btn.setAttribute('dir', 'ltr');
+                }
+                btn.className = "py-4 px-3 bg-gray-100 hover:bg-blue-50 hover:text-blue-600 font-bold rounded-2xl text-base transition border-2 border-transparent cursor-pointer shadow-xs text-center relative overflow-visible";
+                btn.onclick = () => checkAnswer(btn, opt, correctAns);
+                optionsContainer.appendChild(btn);
+            });
+        }
+
+        function startTimer() {
+            clearInterval(timerInterval);
+            timeLeft = 15;
+            timerBar.style.transition = 'none';
+            timerBar.style.width = '100%';
+            
+            setTimeout(() => {
+                timerBar.style.transition = 'width 1s linear';
+            }, 50);
+
+            timerInterval = setInterval(() => {
+                timeLeft--;
+                let percent = (timeLeft / 15) * 100;
+                timerBar.style.width = percent + '%';
+
+                if (timeLeft <= 0) {
+                    clearInterval(timerInterval);
+                    handleTimeout();
+                }
+            }, 1000);
+        }
+
+        function handleTimeout() {
+            if (isAnswered) return;
+            isAnswered = true;
+            
+            // Время вышло — считаем ошибкой и отправляем в конец очереди
+            mistakeQueue.push(sessionQueue[currentIndex]);
+
+            const currentPair = sessionQueue[currentIndex];
+            const correctAns = (currentMode === 'he-ru') ? currentPair.ru : currentPair.he;
+
+            for (let btn of optionsContainer.children) {
+                if (btn.textContent === correctAns) {
+                    btn.classList.remove('bg-gray-100');
+                    btn.classList.add('bg-emerald-500', 'text-white');
+                }
+            }
+
+            setTimeout(() => {
+                currentIndex++;
+                loadQuestion();
+            }, 1500);
+        }
+
+        function checkAnswer(selectedBtn, selectedOpt, correctOpt) {
+            if (isAnswered) return;
+            isAnswered = true;
+            clearInterval(timerInterval);
+
+            const buttons = optionsContainer.children;
+
+            if (selectedOpt === correctOpt) {
+                selectedBtn.classList.remove('bg-gray-100');
+                selectedBtn.classList.add('bg-emerald-500', 'text-white');
+                score += 10;
+                createFireworks(selectedBtn);
+            } else {
+                selectedBtn.classList.remove('bg-gray-100');
+                selectedBtn.classList.add('bg-rose-500', 'text-white');
+
+                // Ошибка — сохраняем слово для повтора в конце
+                mistakeQueue.push(sessionQueue[currentIndex]);
+
+                for (let btn of buttons) {
+                    if (btn.textContent === correctOpt) {
+                        btn.classList.remove('bg-gray-100');
+                        btn.classList.add('bg-emerald-500', 'text-white');
+                    }
+                }
+            }
+
+            setTimeout(() => {
+                currentIndex++;
+                loadQuestion();
+            }, 1400);
+        }
+
+        function createFireworks(button) {
+            const rect = button.getBoundingClientRect();
+            const containerRect = optionsContainer.getBoundingClientRect();
+            
+            const x = rect.left - containerRect.left + rect.width / 2;
+            const y = rect.top - containerRect.top + rect.height / 2;
+
+            const emojis = ["⭐", "✨", "🌟", "💫", "🎉"];
+
+            for (let i = 0; i < 12; i++) {
+                const particle = document.createElement('div');
+                particle.className = 'particle';
+                particle.textContent = emojis[Math.floor(Math.random() * emojis.length)];
+                
+                const angle = Math.random() * Math.PI * 2;
+                const distance = 60 + Math.random() * 80;
+                const tx = Math.cos(angle) * distance;
+                const ty = Math.sin(angle) * distance;
+
+                particle.style.setProperty('--tx', `${tx}px`);
+                particle.style.setProperty('--ty', `${ty}px`);
+                particle.style.left = `${x}px`;
+                particle.style.top = `${y}px`;
+
+                optionsContainer.appendChild(particle);
+
+                setTimeout(() => {
+                    particle.remove();
+                }, 800);
+            }
+        }
+
+        function endGame() {
+            clearInterval(timerInterval);
+            gameScreen.classList.add('hidden');
+            resultScreen.classList.remove('hidden');
+            finalScoreText.textContent = `Твой результат: ${score} очков`;
+            resultEmoji.textContent = "👑";
+        }
+
+        function backToMenu() {
+            clearInterval(timerInterval);
+            gameScreen.classList.add('hidden');
+            resultScreen.classList.add('hidden');
+            startScreen.classList.remove('hidden');
+        }
+    </script>
+</body>
+</html>
